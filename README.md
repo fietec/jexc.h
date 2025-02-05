@@ -1,6 +1,6 @@
 # jecx.h
 
-A simple streaming json lexer used by [cson.h](https://github.com/fietec/cson.h). 
+A simple streaming json lexer written in C and used by [cson.h](https://github.com/fietec/cson.h). 
 
 ## Usage
 ```c 
