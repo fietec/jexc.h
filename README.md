@@ -3,6 +3,7 @@
 A simple streaming json lexer written in C and used by [cson.h](https://github.com/fietec/cson.h). 
 
 ## Usage
+`jexc.h` is an [stb-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) library, which means a single header file and no further dependencies. Define `JEXC_IMPLEMENTATION` to access the function implementations, otherwise `jexc.h` will act as a regular header-file.
 ```c 
 #include <stdio.h>
 #define JEXC_IMPLEMENTATION
