@@ -24,6 +24,7 @@
 */
 
 #ifndef _JEXC_H
+#define _JEXC_H
 
 #include <stdio.h>
 #include <string.h>
