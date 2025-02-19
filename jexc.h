@@ -209,7 +209,7 @@ bool jexc_next(JexcLexer *lexer, JexcToken *token)
                 jexc_set_token(token, JexcToken_Float, t_start, t_end, t_loc);
                 return true;
             }
-            fprintf(stderr, "[ERROR] Invalid literal \"%.*s\" at "JEXC_LOC_FMT"\n", t_end, t_start, t_loc);
+            fprintf(stderr, "[ERROR] Invalid literal \"%.*s\" at "JEXC_LOC_FMT"\n", t_end, t_start, jexc_loc_expand(t_loc));
             jexc_set_token(token, JexcToken_Invalid, t_start, t_end, t_loc);
             return false;
         }

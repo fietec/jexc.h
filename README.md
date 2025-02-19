@@ -41,7 +41,7 @@ buffer:2:16: Int: '23'
 buffer:2:18: Sep: ','
 buffer:2:20: Null: 'null'
 buffer:2:24: ArrayClose: ']'
-buffer:2:25: MapClose: '}''
+buffer:2:25: MapClose: '}'
 ```
 
 ## Functions
