@@ -1,6 +1,6 @@
 # jecx.h
 
-A simple streaming json lexer written in C and used by [cson.h](https://github.com/fietec/cson.h). 
+A simple header-only streaming json lexer written in C.
 
 ## Usage
 `jexc.h` is an [stb-style](https://github.com/nothings/stb/blob/master/docs/stb_howto.txt) library, which means a single header file and no further dependencies. Define `JEXC_IMPLEMENTATION` to access the function implementations, otherwise `jexc.h` will act as a regular header-file.
@@ -46,13 +46,9 @@ buffer:2:25: MapClose: '}'
 
 ## Functions
 ```c 
-JexcLexer jexc_init(char *buffer, size_t buffer_size, char *filename);
-bool jexc_next(JexcLexer *lexer, JexcToken *token);
-bool jexc_expect(JexcLexer *lexer, JexcToken *token, (JexcTokenType) ...); // macro
-bool jexc_extract(JexcToken *token, char *buffer, size_t buffer_size);
-void jexc_print(JexcToken token);
-
-// helper utility functions
-char* jexc_read_entire_file(char *file_path);
-unsigned long long jexc_file_size(const char* file_path);
+JexcLexer jexc_init(char *buffer, size_t buffer_size, char *buffer_name); // initilize the lexer
+bool jexc_next(JexcLexer *lexer, JexcToken *token); // fetch the next token
+bool jexc_expect(lexer, token, (JexcTokenType)...) // fetch the next token and expect one of the given token types (macro)
+bool jexc_extract(JexcToken *token, char *buffer, size_t buffer_size); // extract the content of a token into a buffer
+void jexc_print(JexcToken token); // print a token
 ```

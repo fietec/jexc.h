@@ -26,10 +26,11 @@
 #ifndef _JEXC_H
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 #define jexc_is_whitespace(c) ((c == ' ' || c == '\n' || c == '\t'))
 #define jexc_check_line(lexer, c) do{if (c == '\n'){(lexer)->loc.row++; (lexer)->loc.column=1;}else{lexer->loc.column++;}}while(0)
@@ -41,7 +42,7 @@
 
 #define JEXC_LOC_FMT "%s:%d:%d"
 #define jexc_arr_len(arr) ((arr)!= NULL ? sizeof((arr))/sizeof((arr)[0]):0)
-#define jexc_args_len(...) sizeof((typeof(__VA_ARGS__)[]){__VA_ARGS__})/sizeof(typeof(__VA_ARGS__)/)
+#define jexc_args_len(...) sizeof((typeof(__VA_ARGS__)[]){__VA_ARGS__})/sizeof(typeof(__VA_ARGS__))
 
 typedef enum{
     JexcToken_MapOpen,
@@ -88,8 +89,9 @@ typedef struct{
 
 typedef struct{
     JexcTokenType type;
-    char *t_start;
-    char *t_end;
+    char *start;
+    char *end;
+    size_t len;
     JexcLoc loc;
 } JexcToken;
 
@@ -100,81 +102,76 @@ typedef struct{
     JexcLoc loc;
 } JexcLexer;
 
-#define jexc_expect(lexer, token, ...) jexc__expect(lexer, token, jexc_token_args_array(__VA_ARGS__))
-JexcLexer jexc_init(char *buffer, size_t buffer_size, char *filename);
-bool jexc_next(JexcLexer *lexer, JexcToken *token);
-bool jexc_extract(JexcToken *token, char *buffer, size_t buffer_size);
-void jexc_print(JexcToken token);
+#define jexc_expect(lexer, token, ...) jexc__expect(lexer, token, jexc_token_args_array(__VA_ARGS__)) // fetch the next token and expect one of the given token types
+JexcLexer jexc_init(char *buffer, size_t buffer_size, char *buffer_name); // initilize the lexer
+bool jexc_next(JexcLexer *lexer, JexcToken *token); // fetch the next token
+bool jexc_extract(JexcToken *token, char *buffer, size_t buffer_size); // extract the content of a token into a buffer
+void jexc_print(JexcToken token); // print a token
 
-void jexc_trim_left(JexcLexer *lexer);
-bool jexc_find(JexcLexer *lexer, char c);
-void jexc_set_token(JexcToken *token, JexcTokenType type, char *t_start, char *t_end, JexcLoc loc);
-bool jexc_is_delimeter(char c);
-bool jexc_is_int(char *s, char *e);
-bool jexc_is_float(char *s, char *e);
-
-// helper utility functions
-char* jexc_read_entire_file(char *file_path);
-unsigned long long jexc_file_size(const char* file_path);
-
+// these functions are used internally, there should be no reason to call them yourself
+void jexc__trim_left(JexcLexer *lexer);
+bool jexc__find(JexcLexer *lexer, char c);
+void jexc__set_token(JexcToken *token, JexcTokenType type, char *start, char *end, JexcLoc loc);
+bool jexc__is_delimeter(char c);
+bool jexc__is_int(char *s, char *e);
+bool jexc__is_float(char *s, char *e);
 bool jexc__expect(JexcLexer *lexer, JexcToken *token, JexcTokenType types[], size_t count);
-
 
 #endif // _JEXC_H
 
 #ifdef JEXC_IMPLEMENTATION
 
-JexcLexer jexc_init(char *buffer, size_t buffer_size, char *filename)
+JexcLexer jexc_init(char *buffer, size_t buffer_size, char *buffer_name)
 {
-    return (JexcLexer) {.buffer=buffer, .buffer_size=buffer_size, .index=0, .loc=(JexcLoc){.filename=filename, .row=1, .column=1}};
+    return (JexcLexer) {.buffer=buffer, .buffer_size=buffer_size, .index=0, .loc=(JexcLoc){.filename=buffer_name, .row=1, .column=1}};
 }
 
 bool jexc_next(JexcLexer *lexer, JexcToken *token)
 {
     if (lexer == NULL || token == NULL || lexer->index > lexer->buffer_size) return false;
-    jexc_trim_left(lexer);
-    char *t_start = jexc_get_pointer(lexer);
-    JexcLoc t_loc = lexer->loc;
+    jexc__trim_left(lexer);
+    char *start = jexc_get_pointer(lexer);
+    JexcLoc loc = lexer->loc;
     switch (jexc_get_char(lexer)){
         case '{':{
-            jexc_set_token(token, JexcToken_MapOpen, t_start, t_start+1, t_loc);
+            jexc__set_token(token, JexcToken_MapOpen, start, start+1, loc);
             break;
         }
         case '}':{
-            jexc_set_token(token, JexcToken_MapClose, t_start, t_start+1, t_loc);
+            jexc__set_token(token, JexcToken_MapClose, start, start+1, loc);
             break;
         }
         case '[':{
-            jexc_set_token(token, JexcToken_ArrayOpen, t_start, t_start+1, t_loc);
+            jexc__set_token(token, JexcToken_ArrayOpen, start, start+1, loc);
             break;
         }
         case ']':{
-            jexc_set_token(token, JexcToken_ArrayClose, t_start, t_start+1, t_loc);
+            jexc__set_token(token, JexcToken_ArrayClose, start, start+1, loc);
             break;
         }
         case ',':{
-            jexc_set_token(token, JexcToken_Sep, t_start, t_start+1, t_loc);
+            jexc__set_token(token, JexcToken_Sep, start, start+1, loc);
             break;
         }
         case ':':{
-            jexc_set_token(token, JexcToken_MapSep, t_start, t_start+1, t_loc);
+            jexc__set_token(token, JexcToken_MapSep, start, start+1, loc);
             break;
         }
         case '"':{
             // lex strings
             jexc_inc(lexer);
             char *s_start = jexc_get_pointer(lexer);
-            if (!jexc_find(lexer, '"')){
-                fprintf(stderr, "[ERROR] Missing closing delimeter for '\"' at " JEXC_LOC_FMT "\n", jexc_loc_expand(t_loc));
+            if (!jexc__find(lexer, '"')){
+                fprintf(stderr, "[ERROR] Missing closing delimeter for '\"' at " JEXC_LOC_FMT "\n", jexc_loc_expand(loc));
                 return false;
             }
             char *s_end = jexc_get_pointer(lexer);
-            jexc_set_token(token, JexcToken_String, s_start, s_end, t_loc);
+            jexc__set_token(token, JexcToken_String, s_start, s_end, loc);
             break;
         }
         case '\0':
         case EOF:{
-            jexc_set_token(token, JexcToken_End, t_start, t_start+1, t_loc);
+            jexc__set_token(token, JexcToken_End, start, start+1, loc);
             jexc_inc(lexer);
             return false;
         }
@@ -182,35 +179,35 @@ bool jexc_next(JexcLexer *lexer, JexcToken *token)
             // multi-character literal
             // find end of literal
             char c;
-            while (lexer->index < lexer->buffer_size && !jexc_is_delimeter(c = jexc_get_char(lexer))){
+            while (lexer->index < lexer->buffer_size && !jexc__is_delimeter(c = jexc_get_char(lexer))){
                 jexc_check_line(lexer, c);
                 lexer->index++;
             }
-            char *t_end = jexc_get_pointer(lexer);
-            size_t t_len = t_end-t_start;
+            char *end = jexc_get_pointer(lexer);
+            size_t t_len = end-start;
             // check for known literals
-            if (memcmp(t_start, "true", t_len) == 0){
-                jexc_set_token(token, JexcToken_True, t_start, t_end, t_loc);
+            if (memcmp(start, "true", t_len) == 0){
+                jexc__set_token(token, JexcToken_True, start, end, loc);
                 return true;
             }
-            if (memcmp(t_start, "false", t_len) == 0){
-                jexc_set_token(token, JexcToken_False, t_start, t_end, t_loc);
+            if (memcmp(start, "false", t_len) == 0){
+                jexc__set_token(token, JexcToken_False, start, end, loc);
                 return true;
             }
-            if (memcmp(t_start, "null", t_len) == 0){
-                jexc_set_token(token, JexcToken_Null, t_start, t_end, t_loc);
+            if (memcmp(start, "null", t_len) == 0){
+                jexc__set_token(token, JexcToken_Null, start, end, loc);
                 return true;
             }
-            if (jexc_is_int(t_start, t_end)){
-                jexc_set_token(token, JexcToken_Int, t_start, t_end, t_loc);
+            if (jexc__is_int(start, end)){
+                jexc__set_token(token, JexcToken_Int, start, end, loc);
                 return true;
             }
-            if (jexc_is_float(t_start, t_end)){
-                jexc_set_token(token, JexcToken_Float, t_start, t_end, t_loc);
+            if (jexc__is_float(start, end)){
+                jexc__set_token(token, JexcToken_Float, start, end, loc);
                 return true;
             }
-            fprintf(stderr, "[ERROR] Invalid literal \"%.*s\" at "JEXC_LOC_FMT"\n", t_end, t_start, jexc_loc_expand(t_loc));
-            jexc_set_token(token, JexcToken_Invalid, t_start, t_end, t_loc);
+            fprintf(stderr, "[ERROR] Invalid literal \"%.*s\" at "JEXC_LOC_FMT"\n", end, start, jexc_loc_expand(loc));
+            jexc__set_token(token, JexcToken_Invalid, start, end, loc);
             return false;
         }
     }
@@ -237,14 +234,14 @@ bool jexc__expect(JexcLexer *lexer, JexcToken *token, JexcTokenType types[], siz
 bool jexc_extract(JexcToken *token, char *buffer, size_t buffer_size)
 {
     if (token == NULL || buffer == NULL || buffer_size == 0) return false;
-    size_t t_len = token->t_end-token->t_start;
+    size_t t_len = token->end-token->start;
     if (t_len >= buffer_size) return false;
     if (token->type == JexcToken_String){
         char temp_buffer[t_len+1];
         memset(temp_buffer, 0, t_len+1);
-        char *r = token->t_start;
+        char *r = token->start;
         char *w = temp_buffer;
-        while (r != token->t_end){
+        while (r != token->end){
             if (*r == '\\'){
                 switch(*++r){
                     case '\'': *w = 0x27; break;
@@ -273,26 +270,27 @@ bool jexc_extract(JexcToken *token, char *buffer, size_t buffer_size)
         sprintf(buffer, "%.*s\0", w-temp_buffer+1, temp_buffer);
     }
     else{
-        sprintf(buffer, "%.*s\0", t_len, token->t_start);
+        sprintf(buffer, "%.*s\0", t_len, token->start);
     }
     return true;
 }
 
 void jexc_print(JexcToken token)
 {
-    printf(JEXC_LOC_FMT": %s: '%.*s'\n", jexc_loc_expand(token.loc), JexcTokenTypeNames[token.type], token.t_end-token.t_start, token.t_start);
+    printf(JEXC_LOC_FMT": %s: '%.*s'\n", jexc_loc_expand(token.loc), JexcTokenTypeNames[token.type], token.len, token.start);
 }
 
-void jexc_set_token(JexcToken *token, JexcTokenType type, char *t_start, char *t_end, JexcLoc loc)
+void jexc__set_token(JexcToken *token, JexcTokenType type, char *start, char *end, JexcLoc loc)
 {
     if (token == NULL) return;
     token->type = type;
-    token->t_start = t_start;
-    token->t_end = t_end,
+    token->start = start;
+    token->end = end;
+    token->len = end-start;
     token->loc = loc;
 }
 
-bool jexc_find(JexcLexer *lexer, char c)
+bool jexc__find(JexcLexer *lexer, char c)
 {
     char rc;
     while (lexer->index < lexer->buffer_size){
@@ -303,7 +301,7 @@ bool jexc_find(JexcLexer *lexer, char c)
     return false;
 }
 
-void jexc_trim_left(JexcLexer *lexer)
+void jexc__trim_left(JexcLexer *lexer)
 {
     char c;
     while (lexer->index <= lexer->buffer_size && jexc_is_whitespace((c = jexc_get_char(lexer)))){
@@ -312,7 +310,7 @@ void jexc_trim_left(JexcLexer *lexer)
     }
 }
 
-bool jexc_is_delimeter(char c)
+bool jexc__is_delimeter(char c)
 {
     switch (c){
         case '{':
@@ -330,7 +328,7 @@ bool jexc_is_delimeter(char c)
     }
 }
 
-bool jexc_is_int(char *s, char *e)
+bool jexc__is_int(char *s, char *e)
 {
 	if (!s || !e || e-s < 1) return false;
 	if (*s == '-' || *s == '+') s++;
@@ -340,37 +338,10 @@ bool jexc_is_int(char *s, char *e)
 	return true;
 }
 
-bool jexc_is_float(char *s, char *e)
+bool jexc__is_float(char *s, char *e)
 {
     char* ep = NULL;
     strtod(s, &ep);
     return (ep && ep == e);
-}
-
-#include <sys/stat.h>
-
-unsigned long long jexc_file_size(const char* file_path){
-    struct stat file;
-    if (stat(file_path, &file) == -1){
-        return 0;
-    }
-    return (unsigned long long) file.st_size;
-}
-
-// allocate and populate a string with the file's content
-char* jexc_read_entire_file(char *file_path)
-{
-    if (file_path == NULL) return NULL;
-    FILE *file = fopen(file_path, "r");
-    if (file == NULL) return NULL;
-    unsigned long long size = jexc_file_size(file_path);
-    char *content = (char*) calloc(size+1, sizeof(*content));
-    if (!content){
-        fclose(file);
-        return NULL;
-    }
-    fread(content, 1, size, file);
-    fclose(file);
-    return content;
 }
 #endif // JEXC_IMPLEMENTATION
